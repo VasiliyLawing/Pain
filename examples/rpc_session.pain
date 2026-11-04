@@ -1,0 +1,106 @@
+schema Example.Rpc.Protocol;
+
+frame RpcFrame {
+    length: u32be @max(16777216);
+    tag: RpcMessageType;
+}
+
+enum RpcMessageType : u8 {
+    Handshake     = 0x01,
+    HandshakeAck  = 0x02,
+    JobDispatch   = 0x10,
+    WorkerReport  = 0x20,
+    Progress      = 0x21,
+    TopicUpdate   = 0x30,
+    TopicSnapshot = 0x3F,
+    Ping          = 0xFE,
+    Pong          = 0xFF,
+}
+
+enum OutputFormat : u8 {
+    Text   = 0,
+    Binary = 1,
+}
+
+choice JobArguments : u8 {
+    None = 0 {},
+    RawBytes = 1 {
+        data: bytes;
+    },
+    StringList = 2 {
+        items: list<string> @max(4096);
+    },
+}
+
+choice JobPayload : u8 {
+    Command = 0 {
+        opcode: varint;
+        arguments: list<string> @max(4096);
+        working_dir: optional<string> @sentinel("");
+        digest_sha256: optional<string> @tail @sentinel("");
+        artifact_bytes: varint @tail;
+    },
+    Plugin = 1 {
+        plugin_kind: varint;
+        abi_version: string;
+        size: varint;
+        digest_sha256: optional<string> @sentinel("");
+        artifact_bytes: varint;
+        arguments: JobArguments;
+    },
+}
+
+struct JobOutcome {
+    job_id: guid;
+    ok: bool;
+    output: bytes;
+    stored_externally: bool;
+    output_sha256: optional<string> @sentinel("");
+    output_bytes: varint;
+    format: OutputFormat;
+    artifact_name: optional<string> @sentinel("");
+    part_count: varint;
+}
+
+message Handshake @tag(RpcMessageType.Handshake) {
+    worker_id: guid;
+    capabilities: list<string> @max(1024);
+    auth_token: optional<string> @tail @sentinel("");
+}
+
+message HandshakeAck @tag(RpcMessageType.HandshakeAck) {
+    accepted: bool;
+}
+
+message JobDispatch @tag(RpcMessageType.JobDispatch) {
+    job_id: guid;
+    worker_id: guid;
+    payload: JobPayload;
+}
+
+message WorkerReport @tag(RpcMessageType.WorkerReport) {
+    worker_id: guid;
+    cluster_id: optional<guid> @sentinel(empty);
+    healthy: bool;
+    outcomes: list<JobOutcome> @max(4096);
+}
+
+message Progress @tag(RpcMessageType.Progress) {
+    job_id: guid;
+    stage: varint;
+    steps_done: optional<varint> @sentinel(0);
+    steps_total: optional<varint> @sentinel(0);
+}
+
+message TopicUpdate @tag(RpcMessageType.TopicUpdate) {
+    topic: string;
+    payload: bytes;
+}
+
+message TopicSnapshot @tag(RpcMessageType.TopicSnapshot) {
+    topic_ids: list<string> @prefix(u32be) @max(65536);
+}
+
+message Ping @tag(RpcMessageType.Ping) {}
+
+message Pong @tag(RpcMessageType.Pong) {}

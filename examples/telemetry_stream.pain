@@ -1,0 +1,101 @@
+schema Example.Telemetry.Protocol;
+
+enum TelemetryMessageType : u8 {
+    EnrollRequest  = 0x01,
+    EnrollResponse = 0x02,
+    BatchReport    = 0x03,
+    BatchAck       = 0x04,
+    StreamFrame    = 0x05,
+    KeepAlive      = 0x09,
+}
+
+enum HostOs : u8 {
+    Linux   = 0x01,
+    Windows = 0x02,
+    MacOS   = 0x03,
+}
+
+enum HostArch : u8 {
+    X86_64  = 0x01,
+    Aarch64 = 0x02,
+}
+
+enum ChannelOp : u8 {
+    Open  = 0x01,
+    Data  = 0x02,
+    Close = 0x03,
+}
+
+struct HostInventory {
+    mount_points: list<string> @max(4096);
+    enabled_features: list<string> @max(4096);
+}
+
+struct MetricChunk {
+    series_id: guid;
+    part_index: varint;
+    part_count: varint;
+    samples: bytes;
+}
+
+struct MultiplexFrame {
+    channel_id: u32be;
+    op: ChannelOp;
+    payload: bytes @prefix(u16be) @max(65535);
+}
+
+choice ControlDirective : u8 {
+    Reconfigure = 0x01 {
+        directive_id: guid;
+        keys: list<string> @max(4096);
+    },
+    UploadBundle = 0x02 {
+        directive_id: guid;
+        version: string;
+        size: varint;
+        blobs: list<bytes> @max(4096);
+        entrypoint: optional<string> @sentinel("");
+    },
+}
+
+message EnrollRequest @tag(TelemetryMessageType.EnrollRequest) {
+    flags: bitflags<u8>;
+    streaming: bool @flag(flags, 0x02);
+    device_id: guid;
+    previous_session_id: optional<guid> @sentinel(empty);
+    os: HostOs;
+    hostname: string;
+    arch: HostArch;
+    public_key: bytes;
+    flush_interval_sec: optional<varint> @sentinel(0);
+    inventory: optional<HostInventory> @flag(flags, 0x01);
+}
+
+message EnrollResponse @tag(TelemetryMessageType.EnrollResponse) {
+    flags: u8;
+    slot_index: u8;
+    session_id: guid;
+    session_key: bytes;
+}
+
+message BatchReport @tag(TelemetryMessageType.BatchReport) {
+    flags: bitflags<u8>;
+    session_id: guid;
+    sequence_num: varint;
+    chunks: optional<list<MetricChunk>> @max(4096) @flag(flags, 0x01);
+    frames: optional<list<MultiplexFrame>> @max(256) @flag(flags, 0x02);
+}
+
+message BatchAck @tag(TelemetryMessageType.BatchAck) {
+    flags: bitflags<u8>;
+    upgrade_to_stream: bool @flag(flags, 0x40);
+    sequence_num: varint;
+    directives: optional<list<ControlDirective>> @max(4096) @flag(flags, 0x02);
+    frames: optional<list<MultiplexFrame>> @max(256) @flag(flags, 0x20);
+}
+
+message StreamFrame @tag(TelemetryMessageType.StreamFrame) {
+    frame: MultiplexFrame;
+}
+
+message KeepAlive @tag(TelemetryMessageType.KeepAlive) {}

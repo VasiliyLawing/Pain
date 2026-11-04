@@ -1,0 +1,57 @@
+schema test.core;
+
+frame PacketFrame {
+    length: u32be @max(65536);
+    tag: PacketType;
+}
+
+enum PacketType : u8 {
+    Hello   = 0x01,
+    Summary = 0x02,
+    Action  = 0x03,
+}
+
+enum Mode : u8 {
+    Fast = 1,
+    Safe = 2,
+}
+
+struct Item {
+    id: u32be;
+    label: string;
+    raw: bytes @prefix(u16be) @max(1024);
+}
+
+choice Payload : u8 {
+    Empty = 0 {},
+    Data = 1 {
+        blob: bytes;
+    },
+    Tags = 2 {
+        values: list<string> @max(128);
+    },
+}
+
+message Hello @tag(PacketType.Hello) {
+    session_id: guid;
+    mode: Mode;
+    seq: varint;
+    nickname: optional<string> @sentinel("");
+    retry_ms: optional<varint> @sentinel(0);
+    parent_id: optional<guid> @sentinel(empty);
+    token: optional<string> @tail @sentinel("");
+}
+
+message Summary @tag(PacketType.Summary) {
+    flags: bitflags<u8>;
+    urgent: bool @flag(flags, 0x01);
+    count: varint;
+    featured: optional<Item> @flag(flags, 0x02);
+    items: optional<list<Item>> @max(64) @flag(flags, 0x04);
+}
+
+message Action @tag(PacketType.Action) {
+    id: guid;
+    payload: Payload;
+    ids: list<string> @prefix(u32be) @max(256);
+}
