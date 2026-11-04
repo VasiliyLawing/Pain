@@ -1,0 +1,14 @@
+[package]
+name = "pain"
+version = "0.1.0"
+edition = "2024"
+description = "Declarative binary wire schema compiler and multi-language code generator for custom protocols"
+license = "MIT"
+
+[[bin]]
+name = "pain"
+path = "src/main.rs"
+
+[lib]
+name = "pain"
+path = "src/lib.rs"
