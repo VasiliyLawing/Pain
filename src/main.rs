@@ -5,6 +5,7 @@ use std::process;
 
 use pain::codegen::CodeGenerator;
 use pain::codegen::csharp::CSharpGenerator;
+use pain::codegen::go::GoGenerator;
 use pain::codegen::python::PythonGenerator;
 use pain::codegen::rust::RustGenerator;
 use pain::codegen::zig::ZigGenerator;
@@ -71,6 +72,7 @@ fn run_generate(schema_path: &str, flags: &[String]) {
             "--python" => PythonGenerator.generate(&ir),
             "--csharp" => CSharpGenerator.generate(&ir),
             "--zig" => ZigGenerator.generate(&ir),
+            "--go" => GoGenerator.generate(&ir),
             _ => {
                 eprintln!("unknown target flag '{flag}'");
                 process::exit(1);
@@ -95,6 +97,6 @@ fn print_usage() {
     eprintln!("Usage:");
     eprintln!("  pain check <schema.pain>");
     eprintln!(
-        "  pain generate <schema.pain> [--rust <file>] [--python <file>] [--csharp <file>] [--zig <file>]"
+        "  pain generate <schema.pain> [--rust <file>] [--python <file>] [--csharp <file>] [--zig <file>] [--go <file>]"
     );
 }

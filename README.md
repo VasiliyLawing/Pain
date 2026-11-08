@@ -1,6 +1,6 @@
 # Pain
 
-`pain` compiles a `.pain` binary wire schema into dependency-free encoders and decoders for Rust, Python, C#, and Zig 0.14.0.
+`pain` compiles a `.pain` binary wire schema into dependency-free encoders and decoders for Rust, Python, C#, Zig 0.14.0, and Go.
 
 Each generated module reads and writes identical byte layouts with no runtime reflection and no external serialization libraries.
 
@@ -57,21 +57,22 @@ pain generate examples/rpc_session.pain \
 	--rust out/rpc_session.rs \
 	--python out/rpc_session.py \
 	--csharp out/RpcSession.g.cs \
-	--zig out/rpc_session.zig
+	--zig out/rpc_session.zig \
+	--go out/rpc_session.go
 ```
 
-You can pass any combination of `--rust`, `--python`, `--csharp`, and `--zig` in a single invocation.
+You can pass any combination of `--rust`, `--python`, `--csharp`, `--zig`, and `--go` in a single invocation.
 
 ## Generated API overview
 
 Every target generator emits types for enums, structs, choices, messages, and an optional frame helper.
 
-| Operation | Rust | Python | C# | Zig 0.14.0 |
-| :--- | :--- | :--- | :--- | :--- |
-| Encode a message | `msg.to_bytes()` | `msg.to_bytes()` | `msg.ToBytes()` | `try msg.toBytes(alloc)` |
-| Decode a message | `Msg::from_bytes(buf)` | `Msg.from_bytes(buf)` | `Msg.FromBytes(buf)` | `try Msg.fromBytes(buf, alloc)` |
-| Add a frame header | `encode_frame(&bytes)` | `encode_frame(raw)` | `Frame.EncodeFrame(bytes)` | `try Frame.encodeFrame(alloc, bytes)` |
-| Strip a frame header | `decode_frame(&framed)` | `decode_frame(framed)` | `Frame.DecodeFrame(framed)` | `try Frame.decodeFrame(framed)` |
+| Operation | Rust | Python | C# | Zig 0.14.0 | Go |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Encode a message | `msg.to_bytes()` | `msg.to_bytes()` | `msg.ToBytes()` | `try msg.toBytes(alloc)` | `msg.ToBytes()` |
+| Decode a message | `Msg::from_bytes(buf)` | `Msg.from_bytes(buf)` | `Msg.FromBytes(buf)` | `try Msg.fromBytes(buf, alloc)` | `MsgFromBytes(buf)` |
+| Add a frame header | `encode_frame(&bytes)` | `encode_frame(raw)` | `Frame.EncodeFrame(bytes)` | `try Frame.encodeFrame(alloc, bytes)` | `EncodeFrame(bytes)` |
+| Strip a frame header | `decode_frame(&framed)` | `decode_frame(framed)` | `Frame.DecodeFrame(framed)` | `try Frame.decodeFrame(framed)` | `DecodeFrame(framed)` |
 
 ## Run the test suite
 
@@ -81,7 +82,7 @@ Run the unit tests, target code generation tests, and cross-language byte-equiva
 cargo test
 ```
 
-The integration suite compiles and executes the generated Rust, Python 3, .NET 10 C#, and Zig 0.14.0 outputs and verifies that all four targets produce identical bytes.
+The integration suite compiles and executes the generated Rust, Python 3, .NET 10 C#, Zig 0.14.0, and Go outputs and verifies that all five targets produce identical bytes.
 
 ## Documentation and examples
 

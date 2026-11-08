@@ -3,6 +3,7 @@ use std::process::Command;
 
 use pain::codegen::CodeGenerator;
 use pain::codegen::csharp::CSharpGenerator;
+use pain::codegen::go::GoGenerator;
 use pain::codegen::python::PythonGenerator;
 use pain::codegen::rust::RustGenerator;
 use pain::codegen::zig::ZigGenerator;
@@ -28,6 +29,7 @@ fn cross_language_byte_for_byte_equivalence() {
     let cs_rpc = CSharpGenerator.generate(&rpc_ir);
     let cs_tel = CSharpGenerator.generate(&tel_ir);
     let zig_core = ZigGenerator.generate(&core_ir);
+    let go_core = GoGenerator.generate(&core_ir);
 
     let rust_src = format!(
         r#"{rust_core}
@@ -297,6 +299,91 @@ pub fn main() !void {{
     let zig_out = String::from_utf8(zig_run.stdout).unwrap();
     let zig_lines: Vec<&str> = zig_out.lines().collect();
     assert_eq!(rust_lines, zig_lines);
+
+    let go_dir = dir.join("go_proj");
+    fs::create_dir_all(go_dir.join("core")).unwrap();
+    fs::write(go_dir.join("go.mod"), "module cross\n\ngo 1.21\n").unwrap();
+    fs::write(go_dir.join("core").join("core.go"), go_core).unwrap();
+    fs::write(
+        go_dir.join("main.go"),
+        r#"package main
+
+import (
+	"cross/core"
+	"encoding/hex"
+	"fmt"
+)
+
+func main() {
+	summary := core.Summary{
+		Urgent: true,
+		Count:  300,
+		Featured: &core.Item{
+			Id:    0x12345678,
+			Label: "primary",
+			Raw:   []byte{0xAA, 0xBB, 0xCC},
+		},
+		Items: []core.Item{
+			{
+				Id:    99,
+				Label: "sub",
+				Raw:   []byte{0x01},
+			},
+		},
+	}
+	hello := core.Hello{
+		SessionId: "11111111-2222-3333-4444-555555555555",
+		Mode:      core.ModeFast,
+		Seq:       1024,
+		Nickname:  nil,
+		RetryMs:   core.Ptr[uint64](250),
+		ParentId:  nil,
+		Token:     core.Ptr("tok-99"),
+	}
+	action := core.Action{
+		Id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		Payload: core.PayloadTags{
+			Values: []string{"x", "y"},
+		},
+		Ids: []string{"one", "two"},
+	}
+
+	f1, err := core.EncodeFrame(summary.ToBytes())
+	if err != nil {
+		panic(err)
+	}
+	f2, err := core.EncodeFrame(hello.ToBytes())
+	if err != nil {
+		panic(err)
+	}
+	f3, err := core.EncodeFrame(action.ToBytes())
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(hex.EncodeToString(f1))
+	fmt.Println(hex.EncodeToString(f2))
+	fmt.Println(hex.EncodeToString(f3))
+}
+"#,
+    )
+    .unwrap();
+
+    let go_run = Command::new("go")
+        .arg("run")
+        .arg(".")
+        .current_dir(&go_dir)
+        .output()
+        .unwrap();
+    assert!(
+        go_run.status.success(),
+        "go run failed:\n{}\n{}",
+        String::from_utf8_lossy(&go_run.stdout),
+        String::from_utf8_lossy(&go_run.stderr)
+    );
+    let go_out = String::from_utf8(go_run.stdout).unwrap();
+    let go_lines: Vec<&str> = go_out.lines().collect();
+    assert_eq!(rust_lines, go_lines);
 
     let _ = fs::remove_dir_all(&dir);
 }

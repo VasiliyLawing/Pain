@@ -13,6 +13,7 @@ schema Example.Telemetry.Protocol;
 The compiler maps the package name to the target module structure:
 
 - **C#.** Emits `namespace Example.Telemetry.Protocol;`.
+- **Go.** Emits `package protocol` using the last package segment in lowercase.
 - **Rust, Python, and Zig.** Emits top-level declarations in the generated file.
 
 Line comments begin with `//` and run to the end of the line.
@@ -21,21 +22,21 @@ Line comments begin with `//` and run to the end of the line.
 
 The encoder writes fields in declaration order with no implicit field tags and no alignment padding.
 
-| Schema type | Wire encoding | Rust type | Python type | C# type | Zig 0.14.0 type |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `u8` | 1-byte unsigned integer | `u8` | `int` | `byte` | `u8` |
-| `u16be` | 2-byte big-endian unsigned integer | `u16` | `int` | `ushort` | `u16` |
-| `u16le` | 2-byte little-endian unsigned integer | `u16` | `int` | `ushort` | `u16` |
-| `u32be` | 4-byte big-endian unsigned integer | `u32` | `int` | `uint` | `u32` |
-| `u32le` | 4-byte little-endian unsigned integer | `u32` | `int` | `uint` | `u32` |
-| `u64be` | 8-byte big-endian unsigned integer | `u64` | `int` | `ulong` | `u64` |
-| `u64le` | 8-byte little-endian unsigned integer | `u64` | `int` | `ulong` | `u64` |
-| `varint` | Unsigned LEB128, 1 to 10 bytes | `u64` | `int` | `ulong` | `u64` |
-| `bool` | 1 byte: `0x00` for false, `0x01` for true | `bool` | `bool` | `bool` | `bool` |
-| `bytes` | Length prefix followed by raw bytes | `Vec<u8>` | `bytes` | `byte[]` | `[]const u8` |
-| `string` | `varint` byte length followed by UTF-8 bytes | `String` | `str` | `string` | `[]const u8` |
-| `guid` | 36-byte lowercase hyphenated UUID string | `String` | `str` | `Guid` | `[]const u8` |
-| `bitflags<u8>` | 1-byte bitmask computed from `@flag` fields | Omitted from struct | Omitted from class | Omitted from class | Omitted from struct |
+| Schema type | Wire encoding | Rust type | Python type | C# type | Zig 0.14.0 type | Go type |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `u8` | 1-byte unsigned integer | `u8` | `int` | `byte` | `u8` | `uint8` |
+| `u16be` | 2-byte big-endian unsigned integer | `u16` | `int` | `ushort` | `u16` | `uint16` |
+| `u16le` | 2-byte little-endian unsigned integer | `u16` | `int` | `ushort` | `u16` | `uint16` |
+| `u32be` | 4-byte big-endian unsigned integer | `u32` | `int` | `uint` | `u32` | `uint32` |
+| `u32le` | 4-byte little-endian unsigned integer | `u32` | `int` | `uint` | `u32` | `uint32` |
+| `u64be` | 8-byte big-endian unsigned integer | `u64` | `int` | `ulong` | `u64` | `uint64` |
+| `u64le` | 8-byte little-endian unsigned integer | `u64` | `int` | `ulong` | `u64` | `uint64` |
+| `varint` | Unsigned LEB128, 1 to 10 bytes | `u64` | `int` | `ulong` | `u64` | `uint64` |
+| `bool` | 1 byte: `0x00` for false, `0x01` for true | `bool` | `bool` | `bool` | `bool` | `bool` |
+| `bytes` | Length prefix followed by raw bytes | `Vec<u8>` | `bytes` | `byte[]` | `[]const u8` | `[]byte` |
+| `string` | `varint` byte length followed by UTF-8 bytes | `String` | `str` | `string` | `[]const u8` | `string` |
+| `guid` | 36-byte lowercase hyphenated UUID string | `String` | `str` | `Guid` | `[]const u8` | `string` |
+| `bitflags<u8>` | 1-byte bitmask computed from `@flag` fields | Omitted from struct | Omitted from class | Omitted from class | Omitted from struct | Omitted from struct |
 
 ### Unsigned LEB128 varint rules
 
@@ -173,7 +174,7 @@ The compiler rejects schemas during `pain check` and `pain generate` when they v
 - **Non-trailing `@tail` field.** A field without `@tail` appears after a field with `@tail` in the same field list.
 - **Unannotated optional.** An `optional<T>` field has neither `@flag` nor `@sentinel`, and is not a `@tail` field with an implicit default.
 
-Generated decoders reject malformed inputs with `Result::Err` in Rust, `ValueError` in Python, `InvalidDataException` in C#, and `WireError` in Zig under any of the following conditions:
+Generated decoders reject malformed inputs with `Result::Err` in Rust, `ValueError` in Python, `InvalidDataException` in C#, `WireError` in Zig, and `error` in Go under any of the following conditions:
 
 - The input buffer ends before a required field or length prefix completes.
 - A `varint` exceeds 64 bits.
