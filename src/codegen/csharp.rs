@@ -146,13 +146,13 @@ fn emit_choice(b: &mut CodeBuffer, c: &ChoiceIr) {
         );
         b.line("");
         b.block(
-            &format!("public static {} DecodeWire(WireReader r)", c.name),
+            &format!("public static {} DecodeWire(ref WireReader r)", c.name),
             |b| {
                 b.line(&format!("var tag = {};", read_int_repr(c.tag_repr)));
                 b.block("return tag switch", |b| {
                     for v in &c.variants {
                         b.line(&format!(
-                            "{} => {}.DecodeWire(r),",
+                            "{} => {}.DecodeWire(ref r),",
                             v.discriminant, v.record.name
                         ));
                     }
@@ -200,7 +200,7 @@ fn emit_record(b: &mut CodeBuffer, r: &RecordIr, base_class: Option<&str>) {
             if let Some(tag_byte) = r.tag_byte {
                 let body_ops = &r.ops[1..];
                 b.block(
-                    &format!("public static {} DecodeBody(WireReader r)", r.name),
+                    &format!("public static {} DecodeBody(ref WireReader r)", r.name),
                     |b| {
                         for op in body_ops {
                             emit_decode_op(b, op);
@@ -220,12 +220,12 @@ fn emit_record(b: &mut CodeBuffer, r: &RecordIr, base_class: Option<&str>) {
                 );
                 b.line("");
                 b.block(
-                    &format!("public {new_kw}static {} DecodeWire(WireReader r)", r.name),
+                    &format!("public {new_kw}static {} DecodeWire(ref WireReader r)", r.name),
                     |b| {
                         b.line(&format!(
                             "if (r.ReadU8() != {tag_byte:#04x}) throw new InvalidDataException(\"Unexpected message tag.\");"
                         ));
-                        b.line("return DecodeBody(r);");
+                        b.line("return DecodeBody(ref r);");
                     },
                 );
                 b.line("");
@@ -239,7 +239,7 @@ fn emit_record(b: &mut CodeBuffer, r: &RecordIr, base_class: Option<&str>) {
                     &format!("public static {} FromBytes(ReadOnlySpan<byte> buf)", r.name),
                     |b| {
                         b.line("var r = new WireReader(buf);");
-                        b.line("return DecodeWire(r);");
+                        b.line("return DecodeWire(ref r);");
                     },
                 );
                 b.line("");
@@ -247,12 +247,12 @@ fn emit_record(b: &mut CodeBuffer, r: &RecordIr, base_class: Option<&str>) {
                     &format!("public static {} FromBody(ReadOnlySpan<byte> buf)", r.name),
                     |b| {
                         b.line("var r = new WireReader(buf);");
-                        b.line("return DecodeBody(r);");
+                        b.line("return DecodeBody(ref r);");
                     },
                 );
             } else {
                 b.block(
-                    &format!("public {new_kw}static {} DecodeWire(WireReader r)", r.name),
+                    &format!("public {new_kw}static {} DecodeWire(ref WireReader r)", r.name),
                     |b| {
                         for op in &r.ops {
                             emit_decode_op(b, op);
@@ -601,7 +601,7 @@ fn decode_scalar_expr(scalar: &ScalarKind) -> String {
             format!("{name}Extensions.FromWire({})", read_int_repr(*repr))
         }
         ScalarKind::Struct(name) | ScalarKind::Choice(name) => {
-            format!("{name}.DecodeWire(r)")
+            format!("{name}.DecodeWire(ref r)")
         }
     }
 }
@@ -751,6 +751,7 @@ fn write_prim(p: PrimType, expr: &str) -> String {
 
 const CSHARP_PREAMBLE: &str = r#"using System;
 using System.Buffers.Binary;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -852,7 +853,13 @@ public sealed class WireWriter
         _pos += byteCount;
     }
 
-    public void WriteGuid(Guid g) => WriteStr(g.ToString("D"));
+    public void WriteGuid(Guid g)
+    {
+        WriteVarint(36);
+        Ensure(36);
+        Utf8Formatter.TryFormat(g, _buf.AsSpan(_pos, 36), out _, 'D');
+        _pos += 36;
+    }
 
     private void Ensure(int count)
     {
@@ -862,14 +869,14 @@ public sealed class WireWriter
     }
 }
 
-public sealed class WireReader
+public ref struct WireReader
 {
-    private readonly byte[] _buf;
+    private readonly ReadOnlySpan<byte> _buf;
     private int _pos;
 
     public WireReader(ReadOnlySpan<byte> buf)
     {
-        _buf = buf.ToArray();
+        _buf = buf;
         _pos = 0;
     }
 
@@ -886,7 +893,7 @@ public sealed class WireReader
     public ushort ReadU16Be()
     {
         EnsureAvailable(2);
-        var v = BinaryPrimitives.ReadUInt16BigEndian(_buf.AsSpan(_pos, 2));
+        var v = BinaryPrimitives.ReadUInt16BigEndian(_buf.Slice(_pos, 2));
         _pos += 2;
         return v;
     }
@@ -894,7 +901,7 @@ public sealed class WireReader
     public ushort ReadU16Le()
     {
         EnsureAvailable(2);
-        var v = BinaryPrimitives.ReadUInt16LittleEndian(_buf.AsSpan(_pos, 2));
+        var v = BinaryPrimitives.ReadUInt16LittleEndian(_buf.Slice(_pos, 2));
         _pos += 2;
         return v;
     }
@@ -902,7 +909,7 @@ public sealed class WireReader
     public uint ReadU32Be()
     {
         EnsureAvailable(4);
-        var v = BinaryPrimitives.ReadUInt32BigEndian(_buf.AsSpan(_pos, 4));
+        var v = BinaryPrimitives.ReadUInt32BigEndian(_buf.Slice(_pos, 4));
         _pos += 4;
         return v;
     }
@@ -910,7 +917,7 @@ public sealed class WireReader
     public uint ReadU32Le()
     {
         EnsureAvailable(4);
-        var v = BinaryPrimitives.ReadUInt32LittleEndian(_buf.AsSpan(_pos, 4));
+        var v = BinaryPrimitives.ReadUInt32LittleEndian(_buf.Slice(_pos, 4));
         _pos += 4;
         return v;
     }
@@ -918,7 +925,7 @@ public sealed class WireReader
     public ulong ReadU64Be()
     {
         EnsureAvailable(8);
-        var v = BinaryPrimitives.ReadUInt64BigEndian(_buf.AsSpan(_pos, 8));
+        var v = BinaryPrimitives.ReadUInt64BigEndian(_buf.Slice(_pos, 8));
         _pos += 8;
         return v;
     }
@@ -926,7 +933,7 @@ public sealed class WireReader
     public ulong ReadU64Le()
     {
         EnsureAvailable(8);
-        var v = BinaryPrimitives.ReadUInt64LittleEndian(_buf.AsSpan(_pos, 8));
+        var v = BinaryPrimitives.ReadUInt64LittleEndian(_buf.Slice(_pos, 8));
         _pos += 8;
         return v;
     }
@@ -950,7 +957,7 @@ public sealed class WireReader
     public byte[] ReadRaw(int len)
     {
         EnsureAvailable(len);
-        var slice = _buf.AsSpan(_pos, len).ToArray();
+        var slice = _buf.Slice(_pos, len).ToArray();
         _pos += len;
         return slice;
     }
@@ -971,15 +978,21 @@ public sealed class WireReader
     {
         var len = (int)ReadVarint();
         EnsureAvailable(len);
-        var s = Encoding.UTF8.GetString(_buf, _pos, len);
+        var s = Encoding.UTF8.GetString(_buf.Slice(_pos, len));
         _pos += len;
         return s;
     }
 
     public Guid ReadGuid()
     {
-        var s = ReadStr();
-        if (!Guid.TryParseExact(s, "D", out var g) && !Guid.TryParse(s, out g))
+        var len = (int)ReadVarint();
+        EnsureAvailable(len);
+        var span = _buf.Slice(_pos, len);
+        _pos += len;
+        if (Utf8Parser.TryParse(span, out Guid g, out var consumed, 'D') && consumed == len)
+            return g;
+        var s = Encoding.UTF8.GetString(span);
+        if (!Guid.TryParseExact(s, "D", out g) && !Guid.TryParse(s, out g))
             throw new InvalidDataException("Invalid wire Guid.");
         return g;
     }
