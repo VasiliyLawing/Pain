@@ -241,7 +241,6 @@ pub fn main() !void {{
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const alloc = arena.allocator();
-    const stdout = std.io.getStdOut().writer();
 
     const items_list = [_]Item{{
         .{{ .id = 99, .label = "sub", .raw = &[_]u8{{0x01}} }},
@@ -277,9 +276,8 @@ pub fn main() !void {{
     const f2 = try PacketFrame.encodeFrame(alloc, try hello.toBytes(alloc));
     const f3 = try PacketFrame.encodeFrame(alloc, try action.toBytes(alloc));
 
-    try stdout.print("{{}}\n", .{{std.fmt.fmtSliceHexLower(f1)}});
-    try stdout.print("{{}}\n", .{{std.fmt.fmtSliceHexLower(f2)}});
-    try stdout.print("{{}}\n", .{{std.fmt.fmtSliceHexLower(f3)}});
+    const out = try std.fmt.allocPrint(alloc, "{{x}}\n{{x}}\n{{x}}\n", .{{ f1, f2, f3 }});
+    _ = std.c.write(1, out.ptr, out.len);
 }}
 "#
     );

@@ -790,9 +790,10 @@ pub const WireWriter = struct {
     buf: ?std.ArrayList(u8) = null,
     fixed: ?[]u8 = null,
     position: usize = 0,
+    allocator: std.mem.Allocator = undefined,
 
     pub fn init(allocator: std.mem.Allocator) WireWriter {
-        return .{ .buf = std.ArrayList(u8).init(allocator), .fixed = null, .position = 0 };
+        return .{ .buf = std.ArrayList(u8).empty, .fixed = null, .position = 0, .allocator = allocator };
     }
 
     pub fn initBuffer(buffer: []u8) WireWriter {
@@ -800,11 +801,11 @@ pub const WireWriter = struct {
     }
 
     pub fn deinit(self: *WireWriter) void {
-        if (self.buf) |*b| b.deinit();
+        if (self.buf) |*b| b.deinit(self.allocator);
     }
 
     pub fn toOwnedSlice(self: *WireWriter) WireError![]u8 {
-        if (self.buf) |*b| return b.toOwnedSlice();
+        if (self.buf) |*b| return b.toOwnedSlice(self.allocator);
         return error.OutOfMemory;
     }
 
@@ -816,7 +817,7 @@ pub const WireWriter = struct {
 
     pub fn writeU8(self: *WireWriter, v: u8) WireError!void {
         if (self.buf) |*b| {
-            try b.append(v);
+            try b.append(self.allocator, v);
             self.position = b.items.len;
         } else if (self.fixed) |f| {
             if (self.position >= f.len) return error.BufferOverflow;
@@ -876,7 +877,7 @@ pub const WireWriter = struct {
 
     pub fn writeRaw(self: *WireWriter, data: []const u8) WireError!void {
         if (self.buf) |*b| {
-            try b.appendSlice(data);
+            try b.appendSlice(self.allocator, data);
             self.position = b.items.len;
         } else if (self.fixed) |f| {
             if (self.position + data.len > f.len) return error.BufferOverflow;

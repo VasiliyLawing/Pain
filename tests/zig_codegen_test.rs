@@ -184,7 +184,7 @@ test "telemetry stream roundtrips" {
 
     const mounts = [_][]const u8{"/"};
     const feats = [_][]const u8{"core"};
-    const pubkey = [_]u8{7} ** 32;
+    const pubkey: [32]u8 = @splat(7);
     const req = EnrollRequest{
         .streaming = true,
         .device_id = "11111111-1111-1111-1111-111111111111",
